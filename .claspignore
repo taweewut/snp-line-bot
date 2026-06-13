@@ -1,0 +1,5 @@
+# Repo-only files — never push these to Apps Script
+flex-templates/**
+**/*.md
+.gitignore
+.claspignore

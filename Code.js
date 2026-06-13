@@ -201,7 +201,7 @@ function DailyReport2ToLine() {
             reportSheet.getRange('A6').getValue() + " " + formatNumber(reportSheet.getRange('B6').getValue()) + "\n" +
             reportSheet.getRange('A7').getValue() + " " + formatNumber(reportSheet.getRange('B7').getValue()) + "\n" +
             reportSheet.getRange('A8').getValue() + " " + reportSheet.getRange('B8').getValue() + "\n" +
-            reportSheet.getRange('A9').getValue() + " " + formatDateTime(reportSheet.getRange('B9').getValue()) + "\n";
+            reportSheet.getRange('A9').getValue() + " " + formatDateTime(new Date()) + "\n";   // live send time (was stale cell B9)
 
   Logger.log(msg);
   sendLineMessage(accessToken, groupId, msg);
@@ -291,7 +291,7 @@ function sendFlexReportUsingTemplate(cellRef, targetId = groupId) {
 
   const CommonfeeReport = {
     sdate: DateConvert(reportSheet.getRange('B2').getValue()),
-    sdatetime: formatDateTime(reportSheet.getRange('B9').getValue()),
+    sdatetime: formatDateTime(new Date()),   // actual broadcast send time (was stale cell B9)
     CurrentMonth: reportSheet.getRange('B3').getValue(),
     NumPaid: reportSheet.getRange('B4').getValue(),
     NumAdvancePaid: reportSheet.getRange('B5').getValue(),
