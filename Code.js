@@ -153,9 +153,17 @@ const ccName = "ConsolidatePayments"; // for chatabot
 const flexMessageSheet = ss.getSheetByName("FlexMessage"); // Flex layout content
 
 
-const accessToken = 'KH1mcbFgYsIbHxBxNNfqzqKGg/NOjHQ6ZfjDpZTgNI9q5A1Jf7RAWGcYcBWs3YSk83Jp97ULkZDrGJMLQTOVkWu41UeJwDibVtJdvHF+DarkEVHepJXEktH36IK+b6l4MSSW+xTRTMgEK3Lt+A9gPgdB04t89/1O/w1cDnyilFU='; // shortened for brevity
-const groupId = 'Cb29d3b8bd9de34eacb3128c0c3b06453';  // กลุ่มกรรมการ SNP1 2568 (ใหม่) Cb29d3b8bd9de34eacb3128c0c3b06453 SNP1 กรรมการ 2566 : C283b453cfd30b19c772f9112e6a96b8f   , Test group : C91aa0ac74c0181b7f9b6bc83ec3ccd8b
-const userId = 'U458ef97b64613330dcf9d77cd5258193';
+// Secrets/config live in Script Properties (Project Settings → Script properties),
+// NOT in code, so this file is safe to commit. Set these keys once:
+//   LINE_ACCESS_TOKEN, LINE_GROUP_ID, LINE_USER_ID
+// Group IDs for reference (set whichever in LINE_GROUP_ID):
+//   กรรมการ 2568 (ใหม่): Cb29d3b8bd9de34eacb3128c0c3b06453
+//   กรรมการ 2566       : C283b453cfd30b19c772f9112e6a96b8f
+//   Test group         : C91aa0ac74c0181b7f9b6bc83ec3ccd8b
+const _props = PropertiesService.getScriptProperties();
+const accessToken = _props.getProperty('LINE_ACCESS_TOKEN');
+const groupId = _props.getProperty('LINE_GROUP_ID');
+const userId = _props.getProperty('LINE_USER_ID');
 
 // Predefined Flex Message Data Structure (can expand later)
 
