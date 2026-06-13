@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <meta charset="UTF-8">
+    <title>ตรวจสอบค่าส่วนกลาง</title>
+  </head>
+  <body>
+    <h3>🔍 ตรวจสอบค่าส่วนกลาง</h3>
+    <input id="houseNo" placeholder="ระบุบ้านเลขที่ (เช่น 5)" />
+    <button onclick="checkFee()">ตรวจสอบ</button>
+
+    <pre id="result" style="white-space: pre-wrap;"></pre>
+
+    <script>
+      async function checkFee() {
+        const houseNo = document.getElementById("houseNo").value;
+        const resultArea = document.getElementById("result");
+        resultArea.textContent = "⏳ กำลังดึงข้อมูล...";
+
+        const url = `https://script.google.com/macros/s/AKfycbw2BOBeXfVcwcmAh6Uzfo6XMd9eWIyMWd3h9ICPNZlow1zmCgL8917ITDGxZl1hMk28WQ/exec?houseNo=${encodeURIComponent(houseNo)}`;
+        const res = await fetch(url);
+        const text = await res.text();
+        resultArea.textContent = text;
+      }
+
+      // Optional LIFF init
+      liff.init({ liffId: "2007398812-1QrEPeAr" }).catch(console.error);
+    </script>
+  </body>
+</html>
