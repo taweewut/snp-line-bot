@@ -308,13 +308,15 @@ function DailyReportToLineFlexTemplate2() {
   sendFlexReportUsingTemplate("C2");
 }
 
-function sendFlexReportUsingTemplate(cellRef, targetId = groupId) {
+// Build the LINE flex message object from a template cell (B2/C2).
+// Returns { report, message } — message is ready to drop into push OR reply.
+function buildReportFlexMessage(cellRef) {
   const reportSheet = ss.getSheetByName(ssName);
-  if (!reportSheet || !flexMessageSheet) return;
+  if (!reportSheet || !flexMessageSheet) return null;
 
   const CommonfeeReport = {
     sdate: DateConvert(reportSheet.getRange('B2').getValue()),
-    sdatetime: formatDateTime(new Date()),   // actual broadcast send time (was stale cell B9)
+    sdatetime: formatDateTime(new Date()),   // actual send time (was stale cell B9)
     CurrentMonth: reportSheet.getRange('B3').getValue(),
     NumPaid: reportSheet.getRange('B4').getValue(),
     NumAdvancePaid: reportSheet.getRange('B5').getValue(),
@@ -323,40 +325,46 @@ function sendFlexReportUsingTemplate(cellRef, targetId = groupId) {
     HouseNoPending: reportSheet.getRange('B8').getValue()
   };
 
-  Logger.log(JSON.stringify(CommonfeeReport, null, 2));
-
   const flexJson = flexMessageSheet.getRange(cellRef).getValue();
-  const flexMessage = replaceVariables(JSON.parse(flexJson), CommonfeeReport);
+  const contents = replaceVariables(JSON.parse(flexJson), CommonfeeReport);
 
-  Logger.log("📦 Final Flex Message:\n" + JSON.stringify(flexMessage, null, 2));
-
-  const lineHeader = {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer " + accessToken
+  return {
+    report: CommonfeeReport,
+    message: { type: "flex", altText: "สรุปรายงานชำระค่าส่วนกลาง", contents: contents }
   };
+}
 
-  const payload = {
-    to: targetId,  // ✅ can be groupId or userId
-    messages: [
-      {
-        type: "flex",
-        altText: "สรุปรายงานชำระค่าส่วนกลาง",
-        contents: flexMessage
-      }
-    ]
-  };
+// PUSH the flex report (counts toward quota). Used for the scheduled
+// broadcast to the committee group — no replyToken available there.
+function sendFlexReportUsingTemplate(cellRef, targetId = groupId) {
+  const built = buildReportFlexMessage(cellRef);
+  if (!built) return;
 
-  const options = {
+  const payload = { to: targetId, messages: [built.message] };
+  const response = UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", {
     method: "post",
-    headers: lineHeader,
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
     payload: JSON.stringify(payload)
-  };
-
-  const response = UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", options);
+  });
   Logger.log(response.getContentText());
+  logMessageSent(built.report);
+}
 
-  logMessageSent(CommonfeeReport);  // <-- Pass the actual object
+// REPLY with the flex report (FREE — does not count toward quota). Used when
+// a member taps "รายงานล่าสุด" / types "รายงาน", since we have a replyToken.
+function replyFlexReport(replyToken, cellRef) {
+  const built = buildReportFlexMessage(cellRef);
+  if (!built) return;
 
+  const payload = { replyToken: replyToken, messages: [built.message] };
+  const response = UrlFetchApp.fetch("https://api.line.me/v2/bot/message/reply", {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + accessToken },
+    payload: JSON.stringify(payload)
+  });
+  Logger.log(response.getContentText());
+  logMessageSent(built.report);
 }
 
 
@@ -633,6 +641,7 @@ function doPost(e) {
     const replyToken = event.replyToken;
     const userId = event.source.userId;
     let replyText = "";
+    let replyHandled = false;   // set true when a branch already used the replyToken
 
     // 🏠 5a. House number input (1–70)
     if (/^\d+$/.test(userText)) {
@@ -648,14 +657,14 @@ function doPost(e) {
         replyText = `🏠 บ้านเลขที่ไม่ถูกต้อง (กรุณาระบุเลขระหว่าง 1–70)`;
       }
 
-    // 📊 5b. Request report
+    // 📊 5b. Request report — send via REPLY (free, no quota) instead of push
     } else if (userText === "รายงาน") {
       try {
-        sendFlexReportUsingTemplate("C2", userId);  // Send to user only
-        replyText = "📊 ส่งรายงานให้คุณเรียบร้อยแล้วครับ";
+        replyFlexReport(replyToken, "C2");
+        replyHandled = true;
       } catch (err) {
         replyText = "❌ ไม่สามารถสร้างรายงานได้";
-        Logger.log("❌ sendFlexReportUsingTemplate error: " + err.message);
+        Logger.log("❌ replyFlexReport error: " + err.message);
       }
 
     // 🏠 5c. Rich menu: เช็คยอดบ้านเลขที่ → prompt for house number
@@ -675,8 +684,10 @@ function doPost(e) {
       replyText = `ℹ️ กรุณาพิมพ์เลขบ้าน (1–70) หรือพิมพ์ "รายงาน" เพื่อขอรายงานค่าส่วนกลาง`;
     }
 
-    // 🔹 6. Send reply to user
-    replyMessage(replyToken, replyText);
+    // 🔹 6. Send reply to user (skip if a branch already used the replyToken)
+    if (!replyHandled && replyText) {
+      replyMessage(replyToken, replyText);
+    }
 
   } catch (error) {
     Logger.log("❌ Error in doPost: " + error.message);
