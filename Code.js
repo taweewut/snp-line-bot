@@ -165,6 +165,21 @@ const accessToken = _props.getProperty('LINE_ACCESS_TOKEN');
 const groupId = _props.getProperty('LINE_GROUP_ID');
 const userId = _props.getProperty('LINE_USER_ID');
 
+// Rich-menu static replies — edit these to your real details.
+const PAYMENT_INFO =
+  '💳 วิธีชำระค่าส่วนกลาง (฿1,300 / เดือน)\n' +
+  '────────────\n' +
+  '• โอนเข้าบัญชี: ธนาคารไทยพาณิชย์ สาขาถนนสรงประภา\n' +
+  '  เลขบัญชี 248-228585-4\n' +
+  '  ชื่อบัญชี นิติบุคคลหมู่บ้านจัดสรรเศรณีปาร์ค 1\n' +
+  '• เงินสด: ติดต่อกรรมการ\n\n' +
+  'หลังโอนแล้ว กรุณาส่งสลิปทางกลุ่มไลน์เพื่อออกใบเสร็จครับ';
+const CONTACT_INFO =
+  '📞 ติดต่อกรรมการ SNP1\n' +
+  '────────────\n' +
+  '• คุณพรเทพ: 0644165956\n' +
+  '• กลุ่มไลน์ลูกบ้าน: https://line.me/ti/g/RckmH70pPd';
+
 // Predefined Flex Message Data Structure (can expand later)
 
 const CommonfeeReport = {
@@ -643,7 +658,19 @@ function doPost(e) {
         Logger.log("❌ sendFlexReportUsingTemplate error: " + err.message);
       }
 
-    // ℹ️ 5c. Help message
+    // 🏠 5c. Rich menu: เช็คยอดบ้านเลขที่ → prompt for house number
+    } else if (userText === "เช็คยอดบ้าน") {
+      replyText = '🏠 กรุณาพิมพ์เลขบ้านของคุณ (1–70) เพื่อดูสถานะการชำระค่าส่วนกลางครับ';
+
+    // 💳 5d. Rich menu: วิธีชำระเงิน
+    } else if (userText === "วิธีชำระเงิน") {
+      replyText = PAYMENT_INFO;
+
+    // 📞 5e. Rich menu: ติดต่อกรรมการ
+    } else if (userText === "ติดต่อกรรมการ") {
+      replyText = CONTACT_INFO;
+
+    // ℹ️ 5f. Help message
     } else {
       replyText = `ℹ️ กรุณาพิมพ์เลขบ้าน (1–70) หรือพิมพ์ "รายงาน" เพื่อขอรายงานค่าส่วนกลาง`;
     }
@@ -688,5 +715,100 @@ function doGet(e) {
 function testPendingLog() {
   const result = summarizePaymentByHouse(65); // Replace with test HouseNo
   Logger.log(result);
+}
+
+
+/* =====================================================================
+   RICH MENU  (run setupRichMenu once after designing the image)
+   ---------------------------------------------------------------------
+   Image: PNG/JPEG, exactly 1250 x 843 px, < 1 MB. 2x2 grid of buttons:
+     ┌──────────────────────┬──────────────────────┐
+     │ เช็คยอดบ้านเลขที่      │ รายงานล่าสุด          │   (top, y 0–421)
+     ├──────────────────────┼──────────────────────┤
+     │ วิธีชำระเงิน          │ ติดต่อกรรมการ         │   (bottom, y 421–843)
+     └──────────────────────┴──────────────────────┘
+   Steps:
+     1. Upload the PNG to Google Drive, copy its file ID.
+     2. Add Script Property  RICHMENU_IMAGE_FILE_ID = <that file ID>.
+     3. Run setupRichMenu()  (authorize Drive access when prompted).
+   Re-run cleanly with: listRichMenus() → deleteRichMenu(oldId) → setupRichMenu().
+   ===================================================================== */
+
+const LINE_API = "https://api.line.me/v2/bot";
+const LINE_API_DATA = "https://api-data.line.me/v2/bot";
+
+function setupRichMenu() {
+  const richMenu = {
+    size: { width: 1250, height: 843 },
+    selected: true,
+    name: "SNP1 Main Menu",
+    chatBarText: "เมนู",
+    areas: [
+      // top-left → check own house balance (prompts for house number)
+      { bounds: { x: 0,   y: 0,   width: 625, height: 421 },
+        action: { type: "message", text: "เช็คยอดบ้าน" } },
+      // top-right → latest report (reuses existing "รายงาน" handler)
+      { bounds: { x: 625, y: 0,   width: 625, height: 421 },
+        action: { type: "message", text: "รายงาน" } },
+      // bottom-left → how to pay
+      { bounds: { x: 0,   y: 421, width: 625, height: 422 },
+        action: { type: "message", text: "วิธีชำระเงิน" } },
+      // bottom-right → contact committee
+      { bounds: { x: 625, y: 421, width: 625, height: 422 },
+        action: { type: "message", text: "ติดต่อกรรมการ" } }
+    ]
+  };
+
+  // 1) create the rich menu
+  const createResp = UrlFetchApp.fetch(LINE_API + "/richmenu", {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + accessToken },
+    payload: JSON.stringify(richMenu),
+    muteHttpExceptions: true
+  });
+  Logger.log("create → " + createResp.getResponseCode() + " " + createResp.getContentText());
+  const richMenuId = (JSON.parse(createResp.getContentText()) || {}).richMenuId;
+  if (!richMenuId) { Logger.log("❌ create failed — aborting"); return; }
+
+  // 2) upload the background image (from Drive)
+  const fileId = _props.getProperty('RICHMENU_IMAGE_FILE_ID');
+  if (!fileId) { Logger.log("❌ Set Script Property RICHMENU_IMAGE_FILE_ID first"); return; }
+  const blob = DriveApp.getFileById(fileId).getBlob();
+  const imgResp = UrlFetchApp.fetch(LINE_API_DATA + "/richmenu/" + richMenuId + "/content", {
+    method: "post",
+    contentType: blob.getContentType(),   // must be image/png or image/jpeg
+    headers: { Authorization: "Bearer " + accessToken },
+    payload: blob.getBytes(),
+    muteHttpExceptions: true
+  });
+  Logger.log("image → " + imgResp.getResponseCode() + " " + imgResp.getContentText());
+  if (imgResp.getResponseCode() !== 200) { Logger.log("❌ image upload failed — aborting"); return; }
+
+  // 3) set as the default menu for all users
+  const setResp = UrlFetchApp.fetch(LINE_API + "/user/all/richmenu/" + richMenuId, {
+    method: "post",
+    headers: { Authorization: "Bearer " + accessToken },
+    muteHttpExceptions: true
+  });
+  Logger.log("setDefault → " + setResp.getResponseCode() + " " + setResp.getContentText());
+  Logger.log("✅ Rich menu live: " + richMenuId);
+}
+
+function listRichMenus() {
+  const resp = UrlFetchApp.fetch(LINE_API + "/richmenu/list", {
+    headers: { Authorization: "Bearer " + accessToken },
+    muteHttpExceptions: true
+  });
+  Logger.log(resp.getContentText());
+}
+
+function deleteRichMenu(richMenuId) {
+  const resp = UrlFetchApp.fetch(LINE_API + "/richmenu/" + richMenuId, {
+    method: "delete",
+    headers: { Authorization: "Bearer " + accessToken },
+    muteHttpExceptions: true
+  });
+  Logger.log("delete " + richMenuId + " → " + resp.getResponseCode() + " " + resp.getContentText());
 }
 
