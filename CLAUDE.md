@@ -40,12 +40,31 @@ relying on it. Re-list anytime with `clasp deployments`.
 If the online Apps Script editor may have been touched, run `clasp pull`
 first to avoid overwriting remote changes. Prefer editing locally only.
 
+## Secrets / Configuration (Script Properties)
+Secrets are NOT in code. Code.js reads them from Script Properties via
+`PropertiesService.getScriptProperties()`. Set in the Apps Script editor:
+Project Settings (⚙️) → Script Properties. Required keys:
+- LINE_ACCESS_TOKEN  — LINE channel access token (reissue in LINE console if leaked)
+- LINE_GROUP_ID      — committee group to broadcast to
+- LINE_USER_ID       — test/admin user
+Script Properties are per-project and are NOT pulled by `clasp pull`, so a
+fresh clone must set them manually before the bot will send.
+
+## Flex templates
+The live Flex layouts are stored in the bound Sheet, tab `FlexMessage`
+(B2 = template1 days 25–31, C2 = template2 days 1–10). Code reads them at
+runtime; clasp does NOT sync them. A version-tracked copy lives in
+`flex-templates/` — edit there for history, but the Sheet cell is the source
+of truth at runtime, so paste changes back into the cell.
+
 ## Files
 - Code.js          — main bot logic (webhook handler, payment logic, broadcast)
 - Backup.gs.js     — backup/legacy code
 - index.html.html  — web app HTML
 - appsscript.json  — Apps Script manifest
 - .clasp.json      — clasp config (script ID); gitignored
+- .claspignore     — keeps repo-only files (flex-templates/, *.md) out of clasp push
+- flex-templates/  — version-tracked copies of the Sheet's Flex JSON
 
 ## Conventions
 - Flex Message templates and the data-filling logic should stay in
