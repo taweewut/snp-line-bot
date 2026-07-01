@@ -179,6 +179,14 @@ const CONTACT_INFO =
   '────────────\n' +
   '• คุณพรเทพ: 0644165956\n' +
   '• กลุ่มไลน์ลูกบ้าน: https://line.me/ti/g/RckmH70pPd';
+// Financial report links — plain text; LINE auto-links the bare URLs.
+const FINANCE_REPORT_INFO =
+  '📑 รายงานการเงินของนิติบุคคล SNP1\n' +
+  '────────────\n' +
+  '• รายงานการเงินระหว่างเดือน (Looker Studio):\n' +
+  '  https://datastudio.google.com/reporting/6d83baec-72be-4c58-b89e-1798bacf6b66/page/p_r3wnnus8dd\n\n' +
+  '• รายงานการเงินเดือนล่าสุด (Power BI):\n' +
+  '  https://app.powerbi.com/view?r=eyJrIjoiOTcyYjViMzktMDg4Yi00M2NlLWFkZjAtODg2NjhkMmIwNzNjIiwidCI6ImRmOWMyNjk0LTU5ZmUtNGVhZC1iMWZiLTM0ZWE5YTZhZDU4MiIsImMiOjEwfQ%3D%3D';
 
 // Predefined Flex Message Data Structure (can expand later)
 
@@ -667,6 +675,10 @@ function doPost(e) {
         Logger.log("❌ replyFlexReport error: " + err.message);
       }
 
+    // 📑 5b-2. Rich menu: รายงานการเงินของนิติ → two report links (text)
+    } else if (userText === "รายงานการเงินของนิติ") {
+      replyText = FINANCE_REPORT_INFO;
+
     // 🏠 5c. Rich menu: เช็คยอดบ้านเลขที่ → prompt for house number
     } else if (userText === "เช็คยอดบ้าน") {
       replyText = '🏠 กรุณาพิมพ์เลขบ้านของคุณ (1–70) เพื่อดูสถานะการชำระค่าส่วนกลางครับ';
@@ -732,12 +744,15 @@ function testPendingLog() {
 /* =====================================================================
    RICH MENU  (run setupRichMenu once after designing the image)
    ---------------------------------------------------------------------
-   Image: PNG/JPEG, exactly 1250 x 843 px, < 1 MB. 2x2 grid of buttons:
-     ┌──────────────────────┬──────────────────────┐
-     │ เช็คยอดบ้านเลขที่      │ รายงานล่าสุด          │   (top, y 0–421)
-     ├──────────────────────┼──────────────────────┤
-     │ วิธีชำระเงิน          │ ติดต่อกรรมการ         │   (bottom, y 421–843)
-     └──────────────────────┴──────────────────────┘
+   Image: PNG/JPEG, exactly 1250 x 843 px, < 1 MB. 3x2 grid of buttons
+   (3 columns × 2 rows). Column x-bounds: 0–417, 417–834, 834–1250.
+   Row y-bounds: 0–421, 421–843.
+     ┌───────────────┬───────────────┬───────────────┐
+     │ เช็คยอดบ้าน     │ รายงานล่าสุด    │ รายงานการเงิน   │  (top, y 0–421)
+     │               │               │ ของนิติ        │
+     ├───────────────┼───────────────┼───────────────┤
+     │ วิธีชำระเงิน    │ ติดต่อกรรมการ   │ (ว่าง/สำรอง)   │  (bottom, y 421–843)
+     └───────────────┴───────────────┴───────────────┘
    Steps:
      1. Upload the PNG to Google Drive, copy its file ID.
      2. Add Script Property  RICHMENU_IMAGE_FILE_ID = <that file ID>.
@@ -756,17 +771,22 @@ function setupRichMenu() {
     chatBarText: "เมนู",
     areas: [
       // top-left → check own house balance (prompts for house number)
-      { bounds: { x: 0,   y: 0,   width: 625, height: 421 },
+      { bounds: { x: 0,   y: 0,   width: 417, height: 421 },
         action: { type: "message", text: "เช็คยอดบ้าน" } },
-      // top-right → latest report (reuses existing "รายงาน" handler)
-      { bounds: { x: 625, y: 0,   width: 625, height: 421 },
+      // top-center → latest report (reuses existing "รายงาน" handler)
+      { bounds: { x: 417, y: 0,   width: 417, height: 421 },
         action: { type: "message", text: "รายงาน" } },
+      // top-right → juristic financial report links (Looker + Power BI)
+      { bounds: { x: 834, y: 0,   width: 416, height: 421 },
+        action: { type: "message", text: "รายงานการเงินของนิติ" } },
       // bottom-left → how to pay
-      { bounds: { x: 0,   y: 421, width: 625, height: 422 },
+      { bounds: { x: 0,   y: 421, width: 417, height: 422 },
         action: { type: "message", text: "วิธีชำระเงิน" } },
-      // bottom-right → contact committee
-      { bounds: { x: 625, y: 421, width: 625, height: 422 },
+      // bottom-center → contact committee
+      { bounds: { x: 417, y: 421, width: 417, height: 422 },
         action: { type: "message", text: "ติดต่อกรรมการ" } }
+      // bottom-right (x 834–1250, y 421–843) is reserved/blank for now.
+      // Leave that part of the image empty, or add a 6th action here later.
     ]
   };
 
@@ -812,6 +832,12 @@ function listRichMenus() {
     muteHttpExceptions: true
   });
   Logger.log(resp.getContentText());
+}
+
+// Temporary helper: the Run button can't pass args, so paste the old
+// richMenuId here (from listRichMenus) and run this once, then setupRichMenu().
+function deleteOldRichMenu() {
+  deleteRichMenu("PASTE_OLD_RICHMENU_ID_HERE");
 }
 
 function deleteRichMenu(richMenuId) {
